@@ -29,7 +29,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include "version.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <errno.h>
@@ -53,6 +52,9 @@
 #include <pthread.h>
 
 #define BUFSZ 65536		/*!< @brief Size of network package buffers */
+#ifndef VERSION
+#define VERSION	"$Dev$"
+#endif
 
 const char *argv0 = "netrelay";	/*!< Command name */
 int verbose = 0;		/*!< Flag to add additional diagnostic messages */

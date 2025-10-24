@@ -1,6 +1,7 @@
 PROG = netrelay
 SRC = $(PROG).c
-CFLAGS = -Os -Wall -s
+DVERSION =
+CFLAGS = -Os -Wall -s $(DVERSION)
 DEFAULT_CFLAGS=-static -Os -Wall -s
 X86_64_CFLAGS=$(DEFAULT_CFLAGS)
 
