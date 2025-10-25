@@ -27,19 +27,20 @@ jobs:
     - name: Prepare
       run: |
         incdir=/usr/include/x86_64-linux-musl
+        arch=x86
         set -x
         sudo cp -rs /usr/include/linux "$incdir/linux"
         ls -ld /usr/src/linux-headers-$(uname -r)/ || :
         ls -ld /usr/src/linux-headers-$(uname -r)/arch || :
-        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$(arch) || :
-        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$(arch)/include || :
-        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$(arch)/include/asm || :
+        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch || :
+        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
+        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
         ls /usr/src/linux-headers-$(uname -r)/ || :
         ls /usr/src/linux-headers-$(uname -r)/arch || :
-        ls /usr/src/linux-headers-$(uname -r)/arch/$(arch) || :
-        ls /usr/src/linux-headers-$(uname -r)/arch/$(arch)/include || :
-        ls /usr/src/linux-headers-$(uname -r)/arch/$(arch)/include/asm || :
-        sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$(arch)/include/asm "$incdir/asm"
+        ls /usr/src/linux-headers-$(uname -r)/arch/$arch|| :
+        ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
+        ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
+        sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm "$incdir/asm"
 
         #~ ls -l /usr/include
         #~ ls -l /usr/include/asm || :
