@@ -29,13 +29,14 @@ jobs:
         incdir=/usr/include/x86_64-linux-musl
         set -x
         sudo cp -rs /usr/include/linux "$incdir/linux"
-        ls -l /var/cache/apt/archives
-        ls -l /usr/include
-        ls -l /usr/include/asm || :
-        ls -l /usr/src || :
-        ls -ld /usr/src/*/arch || :
-        uname -r
-        find /usr/src/*/arch -name asm || :
+        sudo cp -rs /usr/src/linux-azure-$(uname -r)/arch/$(arch)/include/asm "$incdir/asm"
+
+        #~ ls -l /usr/include
+        #~ ls -l /usr/include/asm || :
+        #~ ls -l /usr/src || :
+        #~ ls -ld /usr/src/*/arch || :
+        #~ uname -r
+        #~ find /usr/src/*/arch -name asm || :
 
         #~ ( cd "$incdir" && sudo cp -rs /usr/include/asm asm )
         #~ ( cd "$incdir" && sudo cp -rs /usr/include/asm-generic asm-generic )
