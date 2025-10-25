@@ -34,7 +34,7 @@ jobs:
         set -x
         sudo cp -rs /usr/include/linux "$incdir/linux"
         sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$arch/include/generated/uapi/asm "$incdir/asm"
-        find /usr/src/linux-headers-$(uname -r) -name types.h
+        find /usr/src/linux-headers-$(uname -r) -name asm-generic
         #~ ls -ld /usr/src/linux-headers-$(uname -r)/ || :
         #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch || :
         #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch || :
