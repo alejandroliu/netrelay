@@ -26,6 +26,9 @@ jobs:
         sudo cp -rs /usr/include/linux "$incdir/linux"
         ls -l /usr/include
         ls -l /usr/include/asm || :
+        ls -l /usr/src || :
+        ls -ld /usr/src/*/arch || :
+
         #~ ( cd "$incdir" && sudo cp -rs /usr/include/asm asm )
         #~ ( cd "$incdir" && sudo cp -rs /usr/include/asm-generic asm-generic )
     - name: Compile
