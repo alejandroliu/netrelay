@@ -4,6 +4,7 @@ DVERSION =
 CFLAGS = -Os -Wall -s $(DVERSION)
 DEFAULT_CFLAGS=-static -Os -Wall -s
 X86_64_CFLAGS=$(DEFAULT_CFLAGS)
+MUSL_CFLAGS =
 
 
 help::
@@ -43,8 +44,18 @@ $(PROG).aarch64: $(SRC)
 
 aarch64: $(PROG).aarch64
 
+$(PROG).musl: $(SRC)
+	if type musl-gcc ; then \
+	  musl-gcc $(DEFAULT__CFLAGS) -o $@ $(SRC) ; \
+	else \
+		echo "Install musl-tools" ; \
+		false ; \
+	fi
+
+musl: $(PROG).musl
+
 clean:
-	rm -f $(PROG).aarch64 $(PROG).x86_64 $(PROG)
+	rm -f $(PROG).aarch64 $(PROG).x86_64 $(PROG).musl $(PROG)
 
 
 all: $(PROG).aarch64 $(PROG).x86_64
