@@ -33,6 +33,7 @@ jobs:
         arch=x86
         set -x
         sudo cp -rs /usr/include/linux "$incdir/linux"
+        sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$arch/include/generated/uapi/asm "$incdir/asm"
         find /usr/src/linux-headers-$(uname -r) -name types.h
         #~ ls -ld /usr/src/linux-headers-$(uname -r)/ || :
         #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch || :
@@ -44,7 +45,6 @@ jobs:
         #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch|| :
         #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
         #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
-        #~ sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm "$incdir/asm"
 
         #~ ls -l /usr/include
         #~ ls -l /usr/include/asm || :
