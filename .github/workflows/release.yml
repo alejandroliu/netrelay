@@ -29,7 +29,7 @@ jobs:
         incdir=/usr/include/x86_64-linux-musl
         set -x
         sudo cp -rs /usr/include/linux "$incdir/linux"
-        sudo cp -rs /usr/src/linux-azure-$(uname -r)/arch/$(arch)/include/asm "$incdir/asm"
+        sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$(arch)/include/asm "$incdir/asm"
 
         #~ ls -l /usr/include
         #~ ls -l /usr/include/asm || :
