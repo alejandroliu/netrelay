@@ -17,9 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    # name: Cache APT packages
-    # uses: actions/cache@v3
-    #  with:path: /var/cache/apt/archives
+    - name: Cache pkgs
+      id: cache-pkgs
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives
+        key: ${{ runner.os }}-pkgs
     - name: Install packages
       run: |
         sudo apt-get remove --purge man-db
@@ -30,17 +33,18 @@ jobs:
         arch=x86
         set -x
         sudo cp -rs /usr/include/linux "$incdir/linux"
-        ls -ld /usr/src/linux-headers-$(uname -r)/ || :
-        ls -ld /usr/src/linux-headers-$(uname -r)/arch || :
-        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch || :
-        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
-        ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
-        ls /usr/src/linux-headers-$(uname -r)/ || :
-        ls /usr/src/linux-headers-$(uname -r)/arch || :
-        ls /usr/src/linux-headers-$(uname -r)/arch/$arch|| :
-        ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
-        ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
-        sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm "$incdir/asm"
+        find /usr/src/linux-headers-$(uname -r) -name types.h
+        #~ ls -ld /usr/src/linux-headers-$(uname -r)/ || :
+        #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch || :
+        #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch || :
+        #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
+        #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
+        #~ ls /usr/src/linux-headers-$(uname -r)/ || :
+        #~ ls /usr/src/linux-headers-$(uname -r)/arch || :
+        #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch|| :
+        #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
+        #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
+        #~ sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm "$incdir/asm"
 
         #~ ls -l /usr/include
         #~ ls -l /usr/include/asm || :
