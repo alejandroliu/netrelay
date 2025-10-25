@@ -17,17 +17,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    # name: Cache APT packages
+    # uses: actions/cache@v3
+    #  with:path: /var/cache/apt/archives
+    - name: Install packages
+      run: |
+        sudo apt-get remove --purge man-db
+        sudo apt-get update && sudo apt-get install -y musl-tools musl-dev
     - name: Prepare
       run: |
         incdir=/usr/include/x86_64-linux-musl
         set -x
-        sudo apt-get remove --purge man-db
-        sudo apt-get update && sudo apt-get install -y musl-tools musl-dev
         sudo cp -rs /usr/include/linux "$incdir/linux"
+        ls -l /var/cache/apt/archives
         ls -l /usr/include
         ls -l /usr/include/asm || :
         ls -l /usr/src || :
         ls -ld /usr/src/*/arch || :
+        uname -r
         find /usr/src/*/arch -name asm || :
 
         #~ ( cd "$incdir" && sudo cp -rs /usr/include/asm asm )
