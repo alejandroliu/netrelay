@@ -34,9 +34,10 @@ jobs:
         set -x
         sudo cp -rs /usr/include/linux "$incdir/linux"
         sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$arch/include/generated/uapi/asm "$incdir/asm"
-        sudo cp -rs /usr/include/asm-generic "$incdir/asm-generic"
-        find /usr/include /usr/src -name bitsperlong.h
-        find /usr/include /usr/src -type d -name asm
+        sudo cp -rs /usr/src/linux-$(uname -r)/include/asm-generic "$incdir/asm-generic"
+        #~ find /usr/include /usr/src -name bitsperlong.h
+        #~ find /usr/include /usr/src -type d -name asm
+        find /usr/include /usr/src -type d -name asm-generic
         #~ find /usr/src/linux-headers-$(uname -r) -name types.h
         #~ ls -ld /usr/src/linux-headers-$(uname -r)/ || :
         #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch || :
