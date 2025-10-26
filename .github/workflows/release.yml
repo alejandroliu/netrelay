@@ -42,14 +42,13 @@ jobs:
         ln -sf /usr/include/$(arch)-linux-gnu/asm compat/asm
         ln -sf /usr/include/asm-generic compat/asm-generic
         ln -sf /usr/include/linux compat/linux
-        #~ find /usr/src /usr/include -name types.h | grep /asm/
     - name: Compile MUSL version
       run: |
         make default CC=musl-gcc "DVERSION=-Icompat -DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
         zip "netrelay-$(basename "${GITHUB_REF_NAME}"-musl.$(arch).bin.zip" netrelay
     - name: Do NOT release, just create artifact.
       uses: actions/upload-artifact@v4
-      if: !startsWith(github.ref, 'refs/tags/')
+      if: {{!startsWith(github.ref, 'refs/tags/')}}
       with:
         path: netrelay-*.zip
     - name: Upload to release
