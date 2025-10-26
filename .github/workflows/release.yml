@@ -46,11 +46,11 @@ jobs:
       run: |
         make default CC=musl-gcc "DVERSION=-Icompat -DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
         zip "netrelay-$(basename "${GITHUB_REF_NAME}"-musl.$(arch).bin.zip" netrelay
-    - name: Do NOT release, just create artifact.
-      uses: actions/upload-artifact@v4
-      if: {{!startsWith(github.ref, 'refs/tags/')}}
-      with:
-        path: netrelay-*.zip
+    #~ - name: Do NOT release, just create artifact.
+      #~ uses: actions/upload-artifact@v4
+      #~ if: {{!startsWith(github.ref, 'refs/tags/')}}
+      #~ with:
+        #~ path: netrelay-*.zip
     - name: Upload to release
       if: startsWith(github.ref, 'refs/tags/')
       uses: svenstaro/upload-release-action@v2
