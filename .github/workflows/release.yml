@@ -29,44 +29,13 @@ jobs:
         sudo apt-get update && sudo apt-get install -y musl-tools musl-dev
     - name: Prepare
       run: |
-        incdir=/usr/include/x86_64-linux-musl
-        arch=x86
-        set -x
-        sudo cp -rs /usr/include/linux "$incdir/linux"
-        sudo cp -rs /usr/src/linux-headers-$(uname -r)/arch/$arch/include/generated/uapi/asm "$incdir/asm"
-        :
-        sudo mkdir -p $incdir/asm-generic
-        for dir in $(find /usr/include /usr/src -type d -name asm-generic)
-        do
-          sudo cp -rs "$dir"/* "$incdir/asm-generic" || :
-        done
-        #~ sudo cp -rs /usr/src/linux-*-headers-*/include/asm-generic/*  /usr/include/asm-generic/* "$incdir/asm-generic"
-        #~ find /usr/include /usr/src -name bitsperlong.h
-        #~ find /usr/include /usr/src -type d -name asm
-        #~ find /usr/src/linux-headers-$(uname -r) -name types.h
-        #~ ls -ld /usr/src/linux-headers-$(uname -r)/ || :
-        #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch || :
-        #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch || :
-        #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
-        #~ ls -ld /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
-        #~ ls /usr/src/linux-headers-$(uname -r)/ || :
-        #~ ls /usr/src/linux-headers-$(uname -r)/arch || :
-        #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch|| :
-        #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include || :
-        #~ ls /usr/src/linux-headers-$(uname -r)/arch/$arch/include/asm || :
-
-        #~ ls -l /usr/include
-        #~ ls -l /usr/include/asm || :
-        #~ ls -l /usr/src || :
-        #~ ls -ld /usr/src/*/arch || :
-        #~ uname -r
-        #~ find /usr/src/*/arch -name asm || :
-
-        #~ ( cd "$incdir" && sudo cp -rs /usr/include/asm asm )
-        #~ ( cd "$incdir" && sudo cp -rs /usr/include/asm-generic asm-generic )
+        mkdir -p compat
+        ln -sf /usr/include/$(arch)-linux/gnu/asm compat/asm
+        ln -sf /usr/include/asm-generic compat/asm-generic
+        ln -sf /usr/include/linux compat/linux
     - name: Compile
       run: |
-        make default CC=musl-gcc "DVERSION=-DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
+        make default CC=musl-gcc "DVERSION=-Icompat -DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
     - name: Upload to release
       if: startsWith(github.ref, 'refs/tags/')
       uses: svenstaro/upload-release-action@v2

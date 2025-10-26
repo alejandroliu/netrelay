@@ -4,8 +4,7 @@ DVERSION =
 CFLAGS = -Os -Wall -s $(DVERSION)
 DEFAULT_CFLAGS=-static -Os -Wall -s
 X86_64_CFLAGS=$(DEFAULT_CFLAGS)
-MUSL_CFLAGS =
-
+MUSL_CFLAGS = -Icompat
 
 help::
 	@echo "- help : this message"
@@ -46,7 +45,7 @@ aarch64: $(PROG).aarch64
 
 $(PROG).musl: $(SRC)
 	if type musl-gcc ; then \
-	  musl-gcc $(DEFAULT__CFLAGS) -o $@ $(SRC) ; \
+	  musl-gcc $(DEFAULT_CFLAGS) $(MUSL_CFLAGS) -o $@ $(SRC) ; \
 	else \
 		echo "Install musl-tools" ; \
 		false ; \
