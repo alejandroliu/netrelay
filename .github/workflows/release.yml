@@ -34,7 +34,7 @@ jobs:
         ln -sf /usr/include/$(arch)-linux/gnu/asm compat/asm
         ln -sf /usr/include/asm-generic compat/asm-generic
         ln -sf /usr/include/linux compat/linux
-        (cd compat ; find */ -name types.h )
+        find /usr/src /usr/include types.h | grep /asm/
     - name: Compile
       run: |
         make default CC=musl-gcc "DVERSION=-Icompat -DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
