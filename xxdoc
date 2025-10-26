@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+#
+N="
+"
+MARKER="#@"
+
+fixstr() {
+  sed -E -e 's/^[ 	]*#@[	 ]?/:/' "$@"
+}
+
+write() {
+  [ -z "$1" ] && return 0
+  echo -n "$1" | sed -e 's/^://'
+}
+
+hdr() {
+  local file vers='$Exp$' sect="" sn
+  file="$1" ; shift
+  title="$file"
+  if [ $# -gt 0 ] ; then
+    vers="$1"
+    shift
+  fi
+  if [ $# -gt 0 ] ; then
+    sect="$*"
+    shift
+  fi
+  case "$file" in
+  *.[0-9].md)
+    sn="${file%.md}" ; sn="${sn##*.}"
+    title="${title%.[0-9].md}"
+    if [ -z "$sect" ] ; then
+      case "$sn" in
+	1) sect='General commands' ;;
+	2) sect='System calls' ;;
+	3) sect='Library functions' ;;
+	4) sect='Special files and drivers' ;;
+	5) sect='File formats and conventions' ;;
+	6) sect='Games and screensavers' ;;
+	7) sect='Miscellanea' ;;
+	8) sect='System administration commands and daemons' ;;
+      esac
+    fi
+    ;;
+  *)
+    sn="1"
+    [ -z "$sect" ] && sect="Manual pages"
+    ;;
+  esac
+
+  exec > "$file"
+  echo "% ${title}(${sn}) ${vers} | $sect"
+  #~ echo "file = $file" >&2
+  #~ echo "title = $title" >&2
+}
+
+main() {
+  local sedargs=""
+  while [ $# -gt 0 ]
+  do
+    case "$1" in
+    -D*)
+      local kv=${1#-D}
+      local k=${kv%%=*} v=${kv#*=}
+      sedargs="${sedargs}-e${N}s!<%[ 	]*${k}[ 	]*%>!$v!$N"
+      ;;
+    *) break ;;
+    esac
+    shift
+  done
+
+  #~ echo -n "$sedargs" | sed -e 's/^/: /'
+
+  (for f in "$@"
+  do
+    grep -e "^[ 	]*$MARKER[ 	]*" "$f" \
+	| ( IFS="$N" ; fixstr $sedargs )
+  done) | (
+    text=""
+    while read -r line
+    do
+      case "$line" in
+      :@@*)
+	if [ -n "$text" ] ; then
+	  write "$text"
+	fi
+	text=""
+	hdr $(echo "$line" | sed -e 's/^:@@[ 	]*//')
+	;;
+      *)
+	text="${text}${line}${N}"
+	;;
+      esac
+    done
+    write "$text"
+  )
+  #~ echo x "$@"
+}
+
+
+main "$@"
