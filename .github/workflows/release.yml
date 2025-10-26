@@ -30,6 +30,7 @@ jobs:
         sudo apt-get install -y musl-tools musl-dev linux-libc-dev
     - name: Prepare
       run: |
+        set -x
         mkdir -p compat
         ln -sf /usr/include/$(arch)-linux/gnu/asm compat/asm
         ln -sf /usr/include/asm-generic compat/asm-generic
