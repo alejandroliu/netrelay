@@ -17,28 +17,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Cache pkgs
-      id: cache-pkgs
-      uses: actions/cache@v4
-      with:
-        path: /var/cache/apt/archives
-        key: ${{ runner.os }}-pkgs
-    - name: Install packages
+    #~ - name: Cache pkgs
+      #~ id: cache-pkgs
+      #~ uses: actions/cache@v4
+      #~ with:
+        #~ path: /var/cache/apt/archives
+        #~ key: ${{ runner.os }}-pkgs
+    #~ - name: Install packages
+      #~ run: |
+        #~ sudo apt-get remove --purge man-db
+        #~ sudo apt-get update
+        #~ sudo apt-get install -y musl-tools musl-dev linux-libc-dev
+    - name: Disable man-db
       run: |
         sudo apt-get remove --purge man-db
-        sudo apt-get update
-        sudo apt-get install -y musl-tools musl-dev linux-libc-dev
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: musl-tools musl-dev linux-libc-dev
+        version: 1.0
     - name: Prepare
       run: |
         set -x
         mkdir -p compat
-        ln -sf /usr/include/$(arch)-linux/gnu/asm compat/asm
+        ln -sf /usr/include/$(arch)-linux-gnu/asm compat/asm
         ln -sf /usr/include/asm-generic compat/asm-generic
         ln -sf /usr/include/linux compat/linux
-        find /usr/src /usr/include -name types.h | grep /asm/
+        #~ find /usr/src /usr/include -name types.h | grep /asm/
     - name: Compile
       run: |
-        : make default CC=musl-gcc "DVERSION=-Icompat -DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
+        make default CC=musl-gcc "DVERSION=-Icompat -DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
     #~ - name: Upload to release
       #~ if: startsWith(github.ref, 'refs/tags/')
       #~ uses: svenstaro/upload-release-action@v2
