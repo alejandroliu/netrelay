@@ -34,16 +34,16 @@ jobs:
         ln -sf /usr/include/$(arch)-linux/gnu/asm compat/asm
         ln -sf /usr/include/asm-generic compat/asm-generic
         ln -sf /usr/include/linux compat/linux
-        find /usr/src /usr/include types.h | grep /asm/
+        find /usr/src /usr/include -name types.h | grep /asm/
     - name: Compile
       run: |
-        make default CC=musl-gcc "DVERSION=-Icompat -DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
-    - name: Upload to release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: svenstaro/upload-release-action@v2
-      with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: netrelay
-        tag: ${{ github.ref }}
-        overwrite: true
+        : make default CC=musl-gcc "DVERSION=-Icompat -DVERSION='\"$(basename "${GITHUB_REF_NAME}")\"'"
+    #~ - name: Upload to release
+      #~ if: startsWith(github.ref, 'refs/tags/')
+      #~ uses: svenstaro/upload-release-action@v2
+      #~ with:
+        #~ repo_token: ${{ secrets.GITHUB_TOKEN }}
+        #~ file: netrelay
+        #~ tag: ${{ github.ref }}
+        #~ overwrite: true
 
