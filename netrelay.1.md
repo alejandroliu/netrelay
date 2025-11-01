@@ -1,4 +1,4 @@
-% netrelay(1) 1.0 | General commands
+% netrelay(1) $git:979da25$ | General commands
 
 # NAME
 

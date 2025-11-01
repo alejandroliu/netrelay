@@ -1,102 +1,313 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
-#
-N="
-"
-MARKER="#@"
+'''
+Simple documentation extraction tool
 
-fixstr() {
-  sed -E -e 's/^[ 	]*#@[	 ]?/:/' "$@"
+Copyright (c) 2025, TortugaLabs
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+'''
+import argparse
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+try:
+  from icecream import ic # type:ignore
+  ic.configureOutput(includeContext=True)
+except ImportError: # Gracefull fallback if IceCream isn't installed
+  ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a) # noqa
+
+
+verbose = False
+preview = False
+substs = dict()
+
+SECTMAP = {
+  '1': 'General commands',
+  '2': 'System calls',
+  '3': 'Library functions',
+  '4': 'Special files and drivers',
+  '5': 'File formats and conventions',
+  '6': 'Games and screensavers',
+  '7': 'Miscellanea',
+  '8': 'System administration commands and daemons',
 }
 
-write() {
-  [ -z "$1" ] && return 0
-  echo -n "$1" | sed -e 's/^://'
-}
+VCACHE = {}
 
-hdr() {
-  local file vers='$Exp$' sect="" sn
-  file="$1" ; shift
-  title="$file"
-  if [ $# -gt 0 ] ; then
-    vers="$1"
-    shift
-  fi
-  if [ $# -gt 0 ] ; then
-    sect="$*"
-    shift
-  fi
-  case "$file" in
-  *.[0-9].md)
-    sn="${file%.md}" ; sn="${sn##*.}"
-    title="${title%.[0-9].md}"
-    if [ -z "$sect" ] ; then
-      case "$sn" in
-	1) sect='General commands' ;;
-	2) sect='System calls' ;;
-	3) sect='Library functions' ;;
-	4) sect='Special files and drivers' ;;
-	5) sect='File formats and conventions' ;;
-	6) sect='Games and screensavers' ;;
-	7) sect='Miscellanea' ;;
-	8) sect='System administration commands and daemons' ;;
-      esac
-    fi
-    ;;
-  *)
-    sn="1"
-    [ -z "$sect" ] && sect="Manual pages"
-    ;;
-  esac
+def auto_version(f:str):
+  '''Generate a version for a file
 
-  exec > "$file"
-  echo "% ${title}(${sn}) ${vers} | $sect"
-  #~ echo "file = $file" >&2
-  #~ echo "title = $title" >&2
-}
+  :param f: file to version
+  '''
+  if f in VCACHE: return VCACHE[f]
 
-main() {
-  local sedargs=""
-  while [ $# -gt 0 ]
-  do
-    case "$1" in
-    -D*)
-      local kv=${1#-D}
-      local k=${kv%%=*} v=${kv#*=}
-      sedargs="${sedargs}-e${N}s!<%[ 	]*${k}[ 	]*%>!$v!$N"
-      ;;
-    *) break ;;
-    esac
-    shift
-  done
+  def doit(f):
+    rc = subprocess.run(['git','rev-list',
+                          '-1', # Limit to 1 commit
+                          'HEAD', # current HEAD commit
+                          '--',
+                          f], capture_output = True, text = True);
+    if not rc.stdout: return '$Unk$'
+    commit = rc.stdout.strip()
+    rc = subprocess.run(['git','describe',commit],
+                        capture_output = True, text = True);
+    if rc.stdout: return rc.stdout.strip()
+    rc = subprocess.run(['git','describe','--always',commit],
+                        capture_output = True, text = True);
+    if rc.stdout: return f'$git:{rc.stdout.strip()}$'
+    return '$Err$'
+  v = doit(f)
+  VCACHE[f] = v
+  return v
 
-  #~ echo -n "$sedargs" | sed -e 's/^/: /'
+def v(msg:str):
+  '''Print verbose mssage
 
-  (for f in "$@"
-  do
-    grep -e "^[ 	]*$MARKER[ 	]*" "$f" \
-	| ( IFS="$N" ; fixstr $sedargs )
-  done) | (
-    text=""
-    while read -r line
-    do
-      case "$line" in
-      :@@*)
-	if [ -n "$text" ] ; then
-	  write "$text"
-	fi
-	text=""
-	hdr $(echo "$line" | sed -e 's/^:@@[ 	]*//')
-	;;
-      *)
-	text="${text}${line}${N}"
-	;;
-      esac
-    done
-    write "$text"
-  )
-  #~ echo x "$@"
-}
+  :param msg: message to display
+
+  Only display messages if `verbose` is `True`.
+  '''
+  if verbose: sys.stderr.write(msg)
+
+def make_subs(defines:list[str]|None) -> dict[str,str]:
+  '''Check defines and create a dictionary of substitution values
+
+  :param defines: define statements
+  :returns dict: key value pairs
+  '''
+  res = dict()
+  if defines is None: return res
+
+  RE = re.compile(r'^([^=]+)=')
+  VALIDATE = re.compile(r'^[_A-Za-z][_A-Za-z0-9]*$')
+
+  for i in defines:
+    if '=' not in i:
+      res[i] = i
+      continue
+    if (mv := RE.match(i)):
+      if not VALIDATE.match(mv.group(1)):
+        sys.stderr.write(f'{sys.argv[0]}: Invalid define name "{mv.group(1)}"\n')
+        continue
+      res[mv.group(1)] = i[mv.end(1)+1:]
+    else:
+      sys.stderr.write(f'{sys.argv[0]}: syntax error in defining "{i}"\n')
+
+  return res
+
+MARKER = re.compile(r'^\s*#@\s?')
+VAR = re.compile(r'<%\s*([_A-Za-z][_A-Za-z0-9]*)\s*%>')
+IS_MAN_MD = re.compile(r'\.([0-9])\.md$')
+IS_MAN = re.compile(r'\.([0-9])$')
+IS_MD = re.compile(r'\.md$')
+
+def output_txt(txt:list[str], args:argparse.Namespace):
+  '''Output extracted document
+
+  :param txt: list of strings containing output data
+  :param args: attributes for output file
+  '''
+  if not txt: return [], None
+  ic(args)
+
+  if preview:
+    # Do not create file...
+    if IS_MAN.search(args.file):
+      with tempfile.NamedTemporaryFile(
+          mode='w+',
+          suffix='.md',
+          delete_on_close=False) as fp:
+        fp.write('\n'.join(txt))
+        fp.write('\n')
+        fp.close()
+
+        v(f'Running pandoc --to man\n')
+        rc = subprocess.run(['pandoc', '--standalone', '--to','man', fp.name],
+                            stdout = subprocess.PIPE,
+                            text = True,
+                            )
+      with tempfile.NamedTemporaryFile(
+          mode='w+',
+          suffix='.1',
+          delete_on_close=False) as fp:
+        fp.write(rc.stdout)
+        fp.close()
+
+        v(f'Running man\n')
+        rc = subprocess.run(['man', fp.name])
+    elif IS_MD.search(args.file) and shutil.which('mdcat'):
+      rc = subprocess.run(['mdcat'],
+            text = True,
+            input = '\n'.join(txt)+'\n'
+            )
+    else:
+      sys.stdout.write('\n'.join(txt))
+      sys.stdout.write('\n')
+  else:
+    ic(args)
+    if IS_MAN.search(args.file):
+      with tempfile.NamedTemporaryFile(
+          mode='w+',
+          suffix='.md',
+          delete_on_close=False) as fp:
+        fp.write('\n'.join(txt))
+        fp.write('\n')
+        fp.close()
+
+        v(f'Running pandoc --to man\n')
+        rc = subprocess.run(['pandoc', '--standalone', '--to','man', fp.name],
+                            stdout = subprocess.PIPE,
+                            text = True,
+                            )
+        v(f'Writing {args.file}\n')
+        with open(args.file,'w') as ofp:
+          ofp.write(rc.stdout)
+    else:
+      v(f'Writing {args.file}\n')
+      with open(args.file,'w') as fp:
+        fp.write('\n'.join(txt))
+        fp.write('\n')
+
+  return [], None
+
+def process_file(f:str):
+  '''Process one file at a time
+
+  :param f: file to proccess
+  '''
+
+  v(f'Processing {f}\n')
+  with open(f,'r') as fp:
+    lines = [line.rstrip() for line in fp]
+
+  i = 0
+  parser = hdr_parser()
+
+  def submatch(match:re.Match) -> str:
+    var = match.group(1)
+    if not var in substs:
+      if var == 'VERSION': return auto_version(f)
+      sys.stderr.write(f'{f},{i}: unknown reference "{var}"\n')
+      return match.group(0)
+    return substs[var]
+
+  txt = []
+  attrs = None
+  for i in range(len(lines)):
+    if not (mv := MARKER.match(lines[i])): continue
+    ln  = VAR.sub(submatch, lines[i][mv.end(0):])
+    if ln.startswith('@@'):
+      # Special header line found...
+
+      txt,attrs = output_txt(txt, attrs)
+
+      ln  = shlex.split(ln[2:].strip(),True)
+      if ln:
+        ic(ln)
+        attrs = parser.parse_args(ln)
+        if isinstance(attrs.file,list): attrs.file = attrs.file[0]
+        if (mv := IS_MAN_MD.search(attrs.file)) or (mv := IS_MAN.search(attrs.file)):
+          if attrs.title is None: attrs.title = attrs.file[:mv.start(0)]
+          if attrs.section_id is None: attrs.section_id = mv.group(1)
+          if attrs.section is None:
+            if attrs.section_id in SECTMAP:
+              attrs.section = SECTMAP[attrs.section_id]
+            else:
+              attrs.section = 'Manual pages'
+
+          txt.append(f'% {attrs.title}({attrs.section_id}) {attrs.version} | {attrs.section}')
+      else:
+        continue
+    else:
+      txt.append(ln)
+  output_txt(txt, attrs)
 
 
-main "$@"
+def hdr_parser():
+  '''Generate header ArgumentParser
+  :returns ArgumentParser: parser object
+
+  '''
+  cli = argparse.ArgumentParser()
+  cli.add_argument('-s','--section-id', help='Section ID')
+  cli.add_argument('--title', help='Document title')
+  cli.add_argument('file', help='Output file', nargs=1)
+  cli.add_argument('version', help='Version name', nargs='?')
+  cli.add_argument('section', help='Section name', nargs='?')
+  return cli
+
+
+def cli_parser():
+  '''Generate ArgumentParser
+  :returns ArgumentParser: parser object
+  '''
+  cli = argparse.ArgumentParser(prog='xxdoc', description='Generic documentation extractor')
+  cli.add_argument('-v', '--verbose', help='Be verbose', action='store_true', default=False)
+  cli.add_argument('-p', '--preview', help='Preview output file', action='store_true', default=False)
+  cli.add_argument('-D','--define', help='Add substitution variables', action='append')
+  cli.add_argument('files', help='Files to process', nargs='*')
+  return cli
+
+#@@@ xxdoc.1.md <%VERSION%>
+#@ # NAME
+#@
+#@ **xxdoc** -- extract documentation
+#@
+#@ # SYNOPSIS
+#@
+#@ **xxdoc** _[-h]_ _[-v]_ _[-p]_ _[-D DEFINE]_ _[files ...]_
+#@
+#@ # DESCRIPTION
+#@
+#@ **xxdoc** will extract documentation from source files.
+#@ **xxdoc** assumes that the documentation is stored in _Markdown_
+#@ format.  It is able to output `markdown` or `nroff` formats if
+#@ _pandoc_ is available.
+#@
+#@ # OPTIONS
+#@
+#@ * *-h*, *--help* : show help message and exit
+#@ * *-v*, *--verbose* : be verbose
+#@ * *-p*, *--preview* : preview output file
+#@ * *-D* _key=value_ : define subst variables
+#@ * _files_ : files to process
+#@
+
+if __name__ == '__main__':
+  cli = cli_parser()
+  args = cli.parse_args()
+  substs = make_subs(args.define)
+  verbose = args.verbose
+  preview = args.preview
+
+  if args.files:
+    for f in args.files:
+      process_file(f)
+  else:
+    cli.print_help()
+
+

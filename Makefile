@@ -12,11 +12,16 @@ help::
 	@echo "- x86_64 : AMD/INTEL 64-bit executable"
 	@echo "- aarch64 : ARM 64-bit executable (requires pkg: cross-aarch64-linux-musl)"
 	@echo "- all: Make x86_64 and aarch64"
-	@echo "- html : Create HTML documentation"
+	@echo "- musl: Build musl executable"
+	@echo "- html : Create API HTML documentation"
+	@echo "- man : Create man page"
 	@echo "Requires: base-devel"
 
 html:
 	doxygen
+
+man:
+	./xxdoc -v $(SRC) ; \
 
 $(PROG): $(SRC)
 	$(CC) $(CFLAGS) $(LFLAGS) -s -o $@ $(SRC)

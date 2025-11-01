@@ -50,14 +50,33 @@
 //~ #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <pthread.h>
+#include <sys/wait.h>
+#include <time.h>
 
 #define BUFSZ 65536		/*!< @brief Size of network package buffers */
+#define ST_BUFSZ 512		/*!< @brief Size of status buffer */
+#define MARKER 'X'		/*!< @brief Used to match arguments */
+#define UPDATE_INTERVAL 60	/*!< @brief Only update status this often */
 #ifndef VERSION
 #define VERSION	"$Dev$"
 #endif
 
 const char *argv0 = "netrelay";	/*!< Command name */
 int verbose = 0;		/*!< Flag to add additional diagnostic messages */
+char *stbuffer = NULL;		/*!< ps status buffer */
+int stbuffer_sz = 0;		/*!< ps status buffer */
+
+
+/**
+ * @brief Accounting
+ */
+struct net_stats_t {
+  unsigned long long bytes;
+  unsigned long long packets;
+  unsigned long long connects;
+  unsigned long long clients;
+  time_t last;
+} net_stats;
 
 /**
  * @brief Boolean types
@@ -393,13 +412,14 @@ void server_loop(socklst_t *root) {
   socklst_t *sp;
   unsigned char buf[BUFSZ];
 
-  unsigned long long b_cnt = 0, p_cnt = 0;
   char b_buf[16], p_buf[16];
   int doup = False, c_cnt;
+  memset(&net_stats,0, sizeof(net_stats));
 
   int ready, nfds, closing;
   fd_set readfds, closefds;
 
+  signal(SIGCHLD, SIG_IGN);
   for (;;) {
     closing = nfds = 0;
     FD_ZERO(&readfds);
@@ -426,11 +446,12 @@ void server_loop(socklst_t *root) {
       int fd = accept(root->fd, &addr.sa, &addrlen);
       int flag = 1;
       // Disable nagle algorithm
-      setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
       if (fd == -1) {
 	perror("accept");
 	if (verbose) doup = False;
       } else {
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+	net_stats.connects++;
 	char ip[INET6_ADDRSTRLEN];
 	if (verbose) {
 	  fprintf(stderr,"Accepted %d (%s)\n", fd, format_ipaddr(&addr, ip, sizeof(ip)));
@@ -461,9 +482,11 @@ void server_loop(socklst_t *root) {
       ssize_t n = qemu_recv(sp->fd, buf, sizeof(buf), 0);
 
       if (n > 0) {
-	b_cnt += n;
-	p_cnt++;
-	if (verbose) {
+	net_stats.bytes += n;
+	net_stats.packets++;
+	net_stats.clients = c_cnt - 1;
+
+	if (verbose > 1) {
 	  //~ // Check header... (For raw packets)
 	  //~ ssize_t hdr = (buf[0] << 24) | (buf[1] << 16)  | (buf[2] << 8) | buf[3];
 	  //~ fprintf(stderr, "%sBytes: %s Packets: %s - Read %ld Hdr: %ld Avg: %lld (Peers: %d)    \n",
@@ -471,12 +494,23 @@ void server_loop(socklst_t *root) {
 			//~ format_num(b_cnt, b_buf, sizeof(b_buf)),
 			//~ format_num(p_cnt, p_buf, sizeof(p_buf)),
 			//~ n, hdr, b_cnt / p_cnt, c_cnt);
-	  fprintf(stderr, "%sBytes: %s Packets: %s - Read %ld Avg: %lld (Clients: %d)    \n",
+	  fprintf(stderr, "%sBytes: %s Packets: %s - Read %ld Avg: %lld (Clients: %lld)    \n",
 			(doup ? "\033[A" : ""),
-			format_num(b_cnt, b_buf, sizeof(b_buf)),
-			format_num(p_cnt, p_buf, sizeof(p_buf)),
-			n, b_cnt / p_cnt, c_cnt - 1);
+			format_num(net_stats.bytes, b_buf, sizeof(b_buf)),
+			format_num(net_stats.packets, p_buf, sizeof(p_buf)),
+			n, net_stats.bytes / net_stats.packets, net_stats.clients);
 	  doup = True;
+	}
+
+	time_t now = time(NULL);
+	if (stbuffer && (now - net_stats.last) > UPDATE_INTERVAL) { // Only
+	  net_stats.last = UPDATE_INTERVAL;
+	  snprintf(stbuffer, stbuffer_sz, "# %lld Bytes, %lld Packets, %lld Connects, %lld Clients",
+			  net_stats.bytes,
+			  net_stats.packets,
+			  net_stats.connects,
+			  net_stats.clients
+			);
 	}
 
 	socklst_t *np;
@@ -640,8 +674,14 @@ int fsystem(const char *fmt, ...) {
   vsnprintf(cmd, sizeof(cmd), fmt, args);
   va_end(args);
   if (verbose) fprintf(stderr,"x - %s\n", cmd);
-  return system(cmd);
+  int rc =  system(cmd);
+  if (rc && verbose > 1) {
+    fprintf(stderr, "system,%d (%d)", rc, errno);
+    perror(":");
+  }
+  return rc;
 }
+
 
 /**
  * @brief Multi connection type send function
@@ -815,7 +855,8 @@ int cs_parse(const char *input, cs_dat_u *dat) {
       return cs_none;
     }
     // Make sure tun is loaded...
-    if (access("/dev/net/tun", F_OK) != 0) {
+    const char devtun[] = "/dev/net/tun";
+    if (access(devtun, F_OK) != 0) {
       if (fsystem("modprobe tun") != 0) {
 	fprintf(stderr, "%s: missing tun kernel support to connect to \"%s\"\n", argv0, input);
 	return cs_none;
@@ -1045,6 +1086,22 @@ void usage() {
 }
 
 /**
+ * @brief check if this is a buffer argument
+ *
+ * @param arg: buffer argument
+ * @return True if buffer found, False otherwise
+ */
+int chkbuffer(char *arg) {
+  int i;
+  for (i=0; i < ST_BUFSZ-1 ; i++) {
+    if (arg[i] != MARKER) return False;
+  }
+  if (arg[i]) return False;
+  return True;
+}
+
+
+/**
  * @brief Main function.
  *
  * @param argc: argument count
@@ -1059,6 +1116,37 @@ int main(int argc, char**argv) {
   argv0 = (argv++)[0];
   --argc;
 
+  //~ fprintf(stderr, "%d: %s\n", argc, argc > 0 ? argv[0] : "<NULL>");
+  if (argc == 0 || !chkbuffer(argv[0])) {
+    // We need to create a chkbuffer...
+    //~ fprintf(stderr, "Create BUFFER\n");
+    char **newargs = (char **)malloc(sizeof(char *)*(argc+3));
+    if (!newargs) {
+      perror("malloc");
+      exit(EXIT_FAILURE);
+    }
+    char *buf = (char *)malloc(ST_BUFSZ);
+    if (!buf) {
+      perror("malloc");
+      exit(EXIT_FAILURE);
+    }
+    newargs[0] = (char *)argv0;
+    memset(buf, MARKER, ST_BUFSZ-1);
+    buf[ST_BUFSZ-1] = 0;
+    newargs[1] = buf;
+    memcpy(newargs+2, argv, sizeof(char *)*(argc+1));
+
+    execvp(argv0, newargs);
+    perror("exec");
+    return -1;
+  } else {
+    stbuffer = argv[0];
+    stbuffer_sz = strlen(argv[0]);
+    strncpy(stbuffer,"[status]", stbuffer_sz);
+    --argc, ++argv;
+
+  }
+
   while (argc > 0 && !strcmp(*argv,"-v")) {
     ++verbose;
     --argc;
@@ -1072,7 +1160,6 @@ int main(int argc, char**argv) {
     }
     socklst_t root;
     server_init(port, &root);
-    signal(SIGCHLD, SIG_IGN);
 
     for (int i=2;i<argc;i++) {
       if (!cs_parse(argv[i], &chans[0])) continue;
