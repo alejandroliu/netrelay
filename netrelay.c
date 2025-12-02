@@ -1140,11 +1140,20 @@ int main(int argc, char**argv) {
     perror("exec");
     return -1;
   } else {
+    int i, l;
     stbuffer = argv[0];
     stbuffer_sz = strlen(argv[0]);
-    strncpy(stbuffer,"[status]", stbuffer_sz);
     --argc, ++argv;
-
+    for (i=0; argv[i]; i++) {
+      l = strlen(argv[i]);
+      memcpy(stbuffer, argv[i], l);
+      stbuffer[l] = ' ';
+      stbuffer += l;
+      stbuffer_sz -= l;
+      ++stbuffer;
+      --stbuffer_sz;
+    }
+    strncpy(stbuffer,"[status]", stbuffer_sz);
   }
 
   while (argc > 0 && !strcmp(*argv,"-v")) {
